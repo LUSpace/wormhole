@@ -1,0 +1,22 @@
+{
+    "files.associations": {
+        "__config": "cpp",
+        "__locale": "cpp",
+        "__tuple": "cpp",
+        "algorithm": "cpp",
+        "array": "cpp",
+        "atomic": "cpp",
+        "bitset": "cpp",
+        "functional": "cpp",
+        "ios": "cpp",
+        "locale": "cpp",
+        "memory": "cpp",
+        "ostream": "cpp",
+        "ratio": "cpp",
+        "sstream": "cpp",
+        "streambuf": "cpp",
+        "string": "cpp",
+        "utility": "cpp",
+        "vector": "cpp"
+    }
+}
