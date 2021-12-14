@@ -2,14 +2,16 @@ cmake_minimum_required(VERSION 3.19.6)
 project(whSO)
 set(CMAKE_BUILD_TYPE Release)
 
+aux_source_directory(./ DIR_LIB_SRCS)
+list(FILTER DIR_LIB_SRCS EXCLUDE REGEX ".*concbench\\.c$")
+list(FILTER DIR_LIB_SRCS EXCLUDE REGEX ".*easydemo\\.c$")
+list(FILTER DIR_LIB_SRCS EXCLUDE REGEX ".*stresstest\\.c$")
+
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_CXX_FLAGS "-lnuma -lrt -lpthread -ldl -mrtm -msse4.1 -mavx2 -O3 -g -march=native")
- 
-set (PROJECT_LINK_LIBS libwh.so)
-link_directories(./)
- 
-include_directories(./)
+include_directories(.)
+add_compile_options(-std=gnu18  -march=native -mtune=native -pthread -Wall -Wextra -Wshadow -flto -fno-builtin-memcpy -fno-builtin-memmove -fno-builtin-memcmp -DNDEBUG -g3 -O3 -fno-stack-protector -fmax-errors=3 -Wno-unknown-pragmas  -rdynamic -lm -lrt)
 
-add_library(whWrapper SHARED worm_wrapper.cpp)
-target_link_libraries(whWrapper ${PROJECT_LINK_LIBS})
+add_library (WORMHOLE ${DIR_LIB_SRCS})
