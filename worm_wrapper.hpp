@@ -12,7 +12,11 @@ template <class T, class P> class worm_wrapper : public Tree<T, P> {
 public:
   typedef std::pair<T, P> V;
 
-  worm_wrapper() { my_tree = wh_create(); }
+  worm_wrapper() {
+    printf("start invoke constructor\n");
+    my_tree = wh_create();
+    printf("end invoke constructor\n");
+  }
 
   void bulk_load(const V bulk_arr[], int num) {
     struct wormref *ref = wh_ref(my_tree);
