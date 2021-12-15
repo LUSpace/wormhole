@@ -19,6 +19,7 @@ public:
   }
 
   void bulk_load(const V bulk_arr[], int num) {
+    printf("start the bulkload\n");
     struct wormref *ref = wh_ref(my_tree);
     for (int i = 0; i < num; ++i) {
       wh_put(ref, bulk_arr[i].first->key, bulk_arr[i].first->length - 1,
@@ -26,6 +27,7 @@ public:
              sizeof(bulk_arr[i].second));
     }
     wh_unref(ref);
+    printf("end the bulkload\n");
   }
 
   bool insert(const T &key, const P &payload) {
