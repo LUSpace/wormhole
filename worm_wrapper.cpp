@@ -1,5 +1,5 @@
 #include "worm_wrapper.hpp"
 
-extern "C" void *create_tree() {
-  return reinterpret_cast<void *>(new worm_wrapper<string_key *, char *>());
+extern "C" tree_api *create_tree(const tree_options_t &opt) {
+  return new worm_wrapper();
 }
