@@ -38,6 +38,9 @@ class tree_api {
 public:
   virtual ~tree_api(){};
 
+  virtual void bulk_load(char *key[], size_t k_sz[], char *value[],
+                         size_t v_sz[], size_t num_kv) = 0;
+
   /**
    * @brief Lookup record with given key.
    *
@@ -47,7 +50,8 @@ public:
    * @return true if the key was found
    * @return false if the key was not found
    */
-  virtual bool find(const char *key, size_t sz, char *value_out) = 0;
+  virtual bool find(const char *key, size_t sz, char *value_out,
+                    size_t thread_id) = 0;
 
   /**
    * @brief Insert a record with given key and value.
@@ -60,7 +64,7 @@ public:
    * @return false if record was not inserted because it already exists.
    */
   virtual bool insert(const char *key, size_t key_sz, const char *value,
-                      size_t value_sz) = 0;
+                      size_t value_sz, size_t thread_id) = 0;
 
   /**
    * @brief Update the record with given key with the new given value.
@@ -73,7 +77,7 @@ public:
    * @return false if record was not updated because it does not exist.
    */
   virtual bool update(const char *key, size_t key_sz, const char *value,
-                      size_t value_sz) = 0;
+                      size_t value_sz, size_t thread_id) = 0;
 
   /**
    * @brief Remove the record with the given key.
@@ -83,7 +87,7 @@ public:
    * @return true if key was successfully removed.
    * @return false if key did not exist.
    */
-  virtual bool remove(const char *key, size_t key_sz) = 0;
+  virtual bool remove(const char *key, size_t key_sz, size_t thread_id) = 0;
 
   /**
    * @brief Scan records starting from record with given key.
@@ -116,7 +120,7 @@ public:
    * return scanned;
    */
   virtual int scan(const char *key, size_t key_sz, int scan_sz,
-                   char *&values_out) = 0;
+                   char *&values_out, size_t thread_id) = 0;
 };
 
 #endif
