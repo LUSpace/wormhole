@@ -23,7 +23,7 @@
 #define WH_SLABLEAF_SIZE ((1lu << 21)) // 2MB for valgrind
 #endif
 
-#define WH_KPN ((256)) // keys per node; power of 2
+#define WH_KPN ((512)) // keys per node; power of 2
 #define WH_HDIV (((1u << 16)) / WH_KPN)
 #define WH_MID ((WH_KPN >> 1)) // ideal cut point for split, the closer the better
 #define WH_BKT_NR ((8))
