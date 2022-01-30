@@ -2183,7 +2183,8 @@ wormleaf_split_undo(struct wormhole * const map, struct wormleaf * const leaf1,
 wormhole_get(struct wormref * const ref, const struct kref * const key, struct kv * const out)
 {
   struct wormleaf * const leaf = wormhole_jump_leaf_read(ref, key);
-  const u32 i = wormleaf_match_hs(leaf, key);
+  //const u32 i = wormleaf_match_hs(leaf, key);
+  const u32 i = 0;
   struct kv * const tmp = (i < WH_KPN) ? ref->map->mm.out(wormleaf_kv_at_ih(leaf, i), out) : NULL;
   wormleaf_unlock_read(leaf);
   return tmp;
