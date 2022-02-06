@@ -23,7 +23,7 @@
 #define WH_SLABLEAF_SIZE ((1lu << 21)) // 2MB for valgrind
 #endif
 
-#define WH_KPN ((256)) // keys per node; power of 2
+#define WH_KPN ((512)) // keys per node; power of 2
 #define WH_HDIV (((1u << 16)) / WH_KPN)
 #define WH_MID ((WH_KPN >> 1)) // ideal cut point for split, the closer the better
 #define WH_BKT_NR ((8))
@@ -63,7 +63,7 @@ struct wormleaf {
   u64 reserved[2];
 
   struct entry13 hs[WH_KPN]; // sorted by hashes
-  u8 ss[WH_KPN]; // sorted by keys
+  u32 ss[WH_KPN]; // sorted by keys
 };
 
 struct wormslot { u16 t[WH_BKT_NR]; };
@@ -1539,6 +1539,7 @@ wormleaf_search_ih(const struct wormleaf * const leaf, const struct entry13 e)
   return WH_KPN;
 }
 
+// FIXME (BT): Need to update the SIMD operation on ss
 // search for an existing entry in ss
   static u32
 wormleaf_search_is(const struct wormleaf * const leaf, const u8 ih)
@@ -1619,7 +1620,7 @@ wormleaf_seek(const struct wormleaf * const leaf, const struct kref * const key)
   wormleaf_prefetch_ss(leaf); // effective for both hit and miss
   const u32 ih = wormleaf_match_hs(leaf, key);
   if (ih < WH_KPN) { // hit
-    return wormleaf_search_is(leaf, (u8)ih);
+    return wormleaf_search_is(leaf, (u8) ih);
   } else { // miss, binary search for gt
     return wormleaf_search_ss(leaf, key);
   }
@@ -1651,15 +1652,15 @@ wormleaf_sort_m2(struct wormleaf * const leaf, const u32 n1, const u32 n2)
   if (n1 == 0 || n2 == 0)
     return; // no need to sort
 
-  u8 * const ss = leaf->ss;
-  u8 et[WH_KPN/2]; // min(n1,n2) < KPN/2
+  u32 * const ss = leaf->ss;
+  u32 et[WH_KPN/2]; // min(n1,n2) < KPN/2
   if (n1 <= n2) { // merge left
     memcpy(et, &(ss[0]), sizeof(ss[0]) * n1);
-    u8 * eo = ss;
-    u8 * e1 = et; // size == n1
-    u8 * e2 = &(ss[n1]); // size == n2
-    const u8 * const z1 = e1 + n1;
-    const u8 * const z2 = e2 + n2;
+    u32 * eo = ss;
+    u32 * e1 = et; // size == n1
+    u32 * e2 = &(ss[n1]); // size == n2
+    const u32 * const z1 = e1 + n1;
+    const u32 * const z2 = e2 + n2;
     while ((e1 < z1) && (e2 < z2)) {
       const int cmp = kv_compare(wormleaf_kv_at_ih(leaf, *e1), wormleaf_kv_at_ih(leaf, *e2));
       if (cmp < 0)
@@ -1676,11 +1677,11 @@ wormleaf_sort_m2(struct wormleaf * const leaf, const u32 n1, const u32 n2)
       memcpy(eo, e1, sizeof(*eo) * (size_t)(e2 - eo));
   } else {
     memcpy(et, &(ss[n1]), sizeof(ss[0]) * n2);
-    u8 * eo = &(ss[n1 + n2 - 1]); // merge backwards
-    u8 * e1 = &(ss[n1 - 1]); // size == n1
-    u8 * e2 = &(et[n2 - 1]); // size == n2
-    const u8 * const z1 = e1 - n1;
-    const u8 * const z2 = e2 - n2;
+    u32 * eo = &(ss[n1 + n2 - 1]); // merge backwards
+    u32 * e1 = &(ss[n1 - 1]); // size == n1
+    u32 * e2 = &(et[n2 - 1]); // size == n2
+    const u32 * const z1 = e1 - n1;
+    const u32 * const z2 = e2 - n2;
     while ((e1 > z1) && (e2 > z2)) {
       const int cmp = kv_compare(wormleaf_kv_at_ih(leaf, *e1), wormleaf_kv_at_ih(leaf, *e2));
       if (cmp < 0)
@@ -1702,16 +1703,16 @@ wormleaf_sort_m2(struct wormleaf * const leaf, const u32 n1, const u32 n2)
   static int
 wormleaf_ss_cmp(const void * const p1, const void * const p2, void * priv)
 {
-  const struct kv * const k1 = wormleaf_kv_at_ih(priv, *(const u8 *)p1);
-  const struct kv * const k2 = wormleaf_kv_at_ih(priv, *(const u8 *)p2);
+  const struct kv * const k1 = wormleaf_kv_at_ih(priv, *(const u32 *)p1);
+  const struct kv * const k2 = wormleaf_kv_at_ih(priv, *(const u32 *)p2);
   return kv_compare(k1, k2);
 }
 #else // (FreeBSD and APPLE only)
   static int
 wormleaf_ss_cmp(void * priv, const void * const p1, const void * const p2)
 {
-  const struct kv * const k1 = wormleaf_kv_at_ih(priv, *(const u8 *)p1);
-  const struct kv * const k2 = wormleaf_kv_at_ih(priv, *(const u8 *)p2);
+  const struct kv * const k1 = wormleaf_kv_at_ih(priv, *(const u32 *)p1);
+  const struct kv * const k2 = wormleaf_kv_at_ih(priv, *(const u32 *)p2);
   return kv_compare(k1, k2);
 }
 #endif // __linux__
@@ -1741,6 +1742,7 @@ wormleaf_sync_sorted(struct wormleaf * const leaf)
   leaf->nr_sorted = n;
 }
 
+// FIXME (BT): need to change to u32 updates for ss
 // shift a sequence of entries on hs and update the corresponding ss values
   static void
 wormleaf_shift_inc(struct wormleaf * const leaf, const u32 to, const u32 from, const u32 nr)
@@ -1752,6 +1754,18 @@ wormleaf_shift_inc(struct wormleaf * const leaf, const u32 to, const u32 from, c
 #if defined(__x86_64__)
   // TODO: avx512
 #if defined(__AVX2__)
+  const m256 ones = _mm256_set1_epi32(1);
+  const m256 addx = _mm256_set1_epi32((int)(u32)(INT32_MAX + 1 - from - nr));
+  const m256 cmpx = _mm256_set1_epi32((int)(u32)(INT32_MAX - nr));
+  u32 granularity = sizeof(m256) / sizeof(u32);
+
+  for (u32 i = 0; i < leaf->nr_keys; i += granularity) {
+    const m256 sv = _mm256_load_si256((m256 *)(leaf->ss+i));
+    const m256 add1 = _mm256_and_si256(_mm256_cmpgt_epi32(_mm256_add_epi32(sv, addx), cmpx), ones);
+    _mm256_store_si256((m256 *)(leaf->ss+i), _mm256_add_epi32(sv, add1));
+  }
+
+  /*
   const m256 ones = _mm256_set1_epi8(1);
   const m256 addx = _mm256_set1_epi8((char)(u8)(INT8_MAX + 1 - from - nr));
   const m256 cmpx = _mm256_set1_epi8((char)(u8)(INT8_MAX - nr));
@@ -1760,7 +1774,19 @@ wormleaf_shift_inc(struct wormleaf * const leaf, const u32 to, const u32 from, c
     const m256 add1 = _mm256_and_si256(_mm256_cmpgt_epi8(_mm256_add_epi8(sv, addx), cmpx), ones);
     _mm256_store_si256((m256 *)(leaf->ss+i), _mm256_add_epi8(sv, add1));
   }
+  */
 #else // SSE4.2
+  const m128 ones = _mm_set1_epi32(1);
+  const m128 addx = _mm_set1_epi32((int)(u32)(INT32_MAX + 1 - from - nr));
+  const m128 cmpx = _mm_set1_epi32((int)(u32)(INT32_MAX - nr));
+  u32 granularity = sizeof(m128) / sizeof(u32);
+
+  for (u32 i = 0; i < leaf->nr_keys; i += granularity) {
+    const m128 sv = _mm_load_si128((m128 *)(leaf->ss+i));
+    const m128 add1 = _mm_and_si128(_mm_cmpgt_epi32(_mm_add_epi32(sv, addx), cmpx), ones);
+    _mm_store_si128((m128 *)(leaf->ss+i), _mm_add_epi32(sv, add1));
+  }
+  /*
   const m128 ones = _mm_set1_epi8(1);
   const m128 addx = _mm_set1_epi8((char)(u8)(INT8_MAX + 1 - from - nr));
   const m128 cmpx = _mm_set1_epi8((char)(u8)(INT8_MAX - nr));
@@ -1769,6 +1795,7 @@ wormleaf_shift_inc(struct wormleaf * const leaf, const u32 to, const u32 from, c
     const m128 add1 = _mm_and_si128(_mm_cmpgt_epi8(_mm_add_epi8(sv, addx), cmpx), ones);
     _mm_store_si128((m128 *)(leaf->ss+i), _mm_add_epi8(sv, add1));
   }
+  */
 #endif // __AVX2__
 #elif defined(__aarch64__) // __x86_64__
   // aarch64
@@ -1782,6 +1809,7 @@ wormleaf_shift_inc(struct wormleaf * const leaf, const u32 to, const u32 from, c
 #endif // __x86_64__
 }
 
+// FIXME (BT): change to u32 updates for ss
   static void
 wormleaf_shift_dec(struct wormleaf * const leaf, const u32 to, const u32 from, const u32 nr)
 {
@@ -1792,6 +1820,17 @@ wormleaf_shift_dec(struct wormleaf * const leaf, const u32 to, const u32 from, c
 #if defined(__x86_64__)
   // TODO: avx512
 #if defined(__AVX2__)
+  const m256 ones = _mm256_set1_epi32(1);
+  const m256 addx = _mm256_set1_epi32((int)(u32)(INT32_MAX + 1 - from - nr));
+  const m256 cmpx = _mm256_set1_epi32((int)(u32)(INT32_MAX - nr));
+  u32 granularity = sizeof(m256) / sizeof(u32);
+
+  for (u32 i = 0; i < leaf->nr_keys; i += granularity) {
+    const m256 sv = _mm256_load_si256((m256 *)(leaf->ss+i));
+    const m256 add1 = _mm256_and_si256(_mm256_cmpgt_epi32(_mm256_add_epi32(sv, addx), cmpx), ones);
+    _mm256_store_si256((m256 *)(leaf->ss+i), _mm256_sub_epi32(sv, add1));
+  }
+/*
   const m256 ones = _mm256_set1_epi8(1);
   const m256 addx = _mm256_set1_epi8((char)(u8)(INT8_MAX + 1 - from - nr));
   const m256 cmpx = _mm256_set1_epi8((char)(u8)(INT8_MAX - nr));
@@ -1800,7 +1839,20 @@ wormleaf_shift_dec(struct wormleaf * const leaf, const u32 to, const u32 from, c
     const m256 add1 = _mm256_and_si256(_mm256_cmpgt_epi8(_mm256_add_epi8(sv, addx), cmpx), ones);
     _mm256_store_si256((m256 *)(leaf->ss+i), _mm256_sub_epi8(sv, add1));
   }
+  */
 #else // SSE4.2
+  const m128 ones = _mm_set1_epi32(1);
+  const m128 addx = _mm_set1_epi32((int)(u32)(INT32_MAX + 1 - from - nr));
+  const m128 cmpx = _mm_set1_epi32((int)(u32)(INT32_MAX - nr));
+  u32 granularity = sizeof(m128) / sizeof(u32);
+
+  for (u32 i = 0; i < leaf->nr_keys; i += granularity) {
+    const m128 sv = _mm_load_si128((m128 *)(leaf->ss+i));
+    const m128 add1 = _mm_and_si128(_mm_cmpgt_epi32(_mm_add_epi32(sv, addx), cmpx), ones);
+    _mm_store_si128((m128 *)(leaf->ss+i), _mm_sub_epi32(sv, add1));
+  }
+
+  /*
   const m128 ones = _mm_set1_epi8(1);
   const m128 addx = _mm_set1_epi8((char)(u8)(INT8_MAX + 1 - from - nr));
   const m128 cmpx = _mm_set1_epi8((char)(u8)(INT8_MAX - nr));
@@ -1809,6 +1861,7 @@ wormleaf_shift_dec(struct wormleaf * const leaf, const u32 to, const u32 from, c
     const m128 add1 = _mm_and_si128(_mm_cmpgt_epi8(_mm_add_epi8(sv, addx), cmpx), ones);
     _mm_store_si128((m128 *)(leaf->ss+i), _mm_sub_epi8(sv, add1));
   }
+  */
 #endif // __AVX2__
 #elif defined(__aarch64__) // __x86_64__
   // aarch64
@@ -1822,6 +1875,8 @@ wormleaf_shift_dec(struct wormleaf * const leaf, const u32 to, const u32 from, c
 #endif // __x86_64__
 }
 
+// FIXME (BT): Why need to shift ss? Just change the array itself is ok? 
+// Re: yes, ss is only updated instead of shift
 // insert hs and also shift ss
   static u32
 wormleaf_insert_hs(struct wormleaf * const leaf, const struct entry13 e)
@@ -1859,7 +1914,7 @@ wormleaf_insert_hs(struct wormleaf * const leaf, const struct entry13 e)
   if (i < (i0 + 1))
     i = i0 + 1;
   while ((i < WH_KPN) && hs[i].e1)
-    i++;
+    i++; 
   const u32 er = i; // er > i0 or el is invalid (>= KPN)
 
   // el <= il < ir <= er    (if < WH_KPN)
@@ -1887,7 +1942,7 @@ wormleaf_insert_e13(struct wormleaf * const leaf, const struct entry13 e)
   const u32 ih = wormleaf_insert_hs(leaf, e);
   debug_assert(ih < WH_KPN);
   // append the new is
-  leaf->ss[leaf->nr_keys] = (u8)ih;
+  leaf->ss[leaf->nr_keys] = ih;
   // fix nr
   leaf->nr_keys++;
 }
@@ -1966,7 +2021,7 @@ wormleaf_remove(struct wormleaf * const leaf, const u32 ih, const u32 is)
 wormleaf_remove_ih(struct wormleaf * const leaf, const u32 ih)
 {
   // remove from ss
-  const u32 is = wormleaf_search_is(leaf, (u8)ih);
+  const u32 is = wormleaf_search_is(leaf, (u8) ih);
   debug_assert(is < leaf->nr_keys);
   return wormleaf_remove(leaf, ih, is);
 }
@@ -2828,6 +2883,7 @@ wormhole_inpr(struct wormref * const ref, const struct kref * const key,
     kv_inp_func uf, void * const priv)
 {
   struct wormleaf * const leaf = wormhole_jump_leaf_read(ref, key);
+  
   // const u32 im = wormleaf_match_hs(leaf, key);
   const u32 im = 0;
   if (im < WH_KPN) {
