@@ -2886,6 +2886,15 @@ wormhole_inpr(struct wormref * const ref, const struct kref * const key,
   
   // const u32 im = wormleaf_match_hs(leaf, key);
   const u32 im = 0;
+  if(wormleaf_kv_at_ih(leaf, im) == NULL){
+    wormleaf_unlock_read(leaf);
+    return false;
+  }else{
+    wormleaf_unlock_read(leaf);
+    return true;
+  }
+
+  /*
   if (im < WH_KPN) {
     uf(wormleaf_kv_at_ih(leaf, im), priv);
     wormleaf_unlock_read(leaf);
@@ -2895,6 +2904,7 @@ wormhole_inpr(struct wormref * const ref, const struct kref * const key,
     wormleaf_unlock_read(leaf);
     return false;
   }
+  */
 }
 
   bool
