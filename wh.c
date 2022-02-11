@@ -2388,6 +2388,7 @@ wormmeta_split(struct wormhmap * const hmap, struct wormleaf * const leaf,
   const u32 alen = leaf->anchor->klen;
 
   // save klen
+  // insert all prefixes of the anchor into the metaTrieTable
   const u32 mklen = mkey->klen;
   wormhole_prefix(mkey, i);
   do {
@@ -2432,7 +2433,7 @@ wormhole_split_meta(struct wormref * const ref, struct wormleaf * const leaf2)
   }
 
   struct wormhmap * const hmap0 = wormhmap_load(map);
-  struct wormhmap * const hmap1 = wormhmap_switch(map, hmap0);
+  struct wormhmap * const hmap1 = wormhmap_switch(map, hmap0); // Switch to another hmap
 
   // link
   struct wormleaf * const leaf1 = leaf2->prev;
@@ -3725,6 +3726,14 @@ wh_put(struct wormref * const ref, const void * const kbuf, const u32 klen,
   // must use with kvmap_mm_ndf (see below)
   // the newkv will be saved in the Wormhole and freed by Wormhole when upon deletion
   return wh_api->put(ref, newkv);
+}
+
+void metatable_size(struct wormref * const ref){
+   struct wormhole * map = ref->map;
+   struct wormhmap *hmap = map->hmap;
+   u64 table_size = hmap->msize;
+   printf("The table size (B) = %llu\n", table_size);
+   printf("The table size (KB) = %llu\n", table_size / (1 << 10));
 }
 
 // delete a key

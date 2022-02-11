@@ -25,6 +25,10 @@ public:
                  reinterpret_cast<const void *const>(value[i]), sizeof(size_t));
       wh_unref(ref);
     }
+
+    struct wormref *ref = wh_ref(my_tree);
+    metatable_size(ref);
+    wh_unref(ref);
   }
 
   bool insert(const char *key, size_t key_sz, const char *value,
